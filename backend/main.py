@@ -3,7 +3,7 @@ import re
 from typing import Any, Dict, List
 import docx
 import pandas as pd
-import spacy
+#import spacy
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import (ExtractRequest, ExtractResponse, FolderFile, RecentFiles, Statistics, PreviewData, SearchRequest)
@@ -48,7 +48,7 @@ JOB_STATUS = {
     "current_file": ""
 }
  
-nlp = spacy.load("en_core_web_sm")
+#nlp = spacy.load("en_core_web_sm")
 
 
 def extract_text_from_pdf(path):
