@@ -11,11 +11,11 @@
   "rewrites": [
     {
       "source": "/main(/.*)?",
-      "destination": { "service": "backend" }
+      "destination": { "service": "api/main" }
     },
     {
       "source": "/(.*)",
-      "destination": { "service": "frontend" }
+      "destination": { "service": "app" }
     }
   ]
 }
