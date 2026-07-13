@@ -1,4 +1,4 @@
-const API_BASE = "https://automatic-resume-tracker.vercel.app/";
+const API_BASE = "https://automatic-resume-tracker-qm58.vercel.app/";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, options);
