@@ -754,24 +754,45 @@ def upload_zip_file(file: UploadFile = File(...)):
 
 @app.post("/api/extract")
 def extract_zip_file(payload: ExtractRequest):
-
     folder_name = payload.folder_name
     destination_name = payload.destination_name or folder_name
 
     zip_path = os.path.join(UPLOAD_DIR, folder_name + ".zip")
     extract_path = os.path.join(UPLOAD_DIR, destination_name)
 
+    if not os.path.exists(zip_path):
+        raise HTTPException(status_code=404, detail="Uploaded zip not found")
+
     os.makedirs(extract_path, exist_ok=True)
 
+    JOB_STATUS["status"] = "extracting"
+    JOB_STATUS["progress"] = 0
+    JOB_STATUS["message"] = "Reading zip contents..."
+
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(extract_path)
+        members = [
+            m for m in zip_ref.infolist()
+            if not m.filename.startswith("__MACOSX")
+            and not os.path.basename(m.filename).startswith(".")
+            and not m.is_dir()
+        ]
+        total = len(members) or 1
 
-    file_count = len(os.listdir(extract_path))
+        for i, member in enumerate(members):
+            JOB_STATUS["progress"] = int((i / total) * 100)
+            JOB_STATUS["current_file"] = os.path.basename(member.filename)
+            JOB_STATUS["message"] = f"Extracting {os.path.basename(member.filename)}"
+            zip_ref.extract(member, extract_path)
 
-    return ExtractResponse(
-        folder_name=destination_name,
-        file_count=file_count
+    JOB_STATUS["progress"] = 100
+    JOB_STATUS["status"] = "extracted"
+    JOB_STATUS["message"] = "Extraction complete"
+
+    file_count = sum(
+        len(files) for _, _, files in os.walk(extract_path)
     )
+
+    return ExtractResponse(folder_name=destination_name, file_count=file_count)
 
 @app.get("/api/folders")
 def folder_names():
