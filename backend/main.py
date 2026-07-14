@@ -54,7 +54,7 @@ JOB_STATUS = {
 def extract_text_from_pdf(path):
     text = ""
     try:
-        doc = fitz.open(path)
+        doc = pymupdf.open(path)
         for page in doc:
             text += page.get_text()
         doc.close()
