@@ -773,7 +773,7 @@ def extract_zip_file(payload: ExtractRequest):
  
     return ExtractResponse(
         folder_name=destination_name,
-        file_count=file_count
+        file_count=file_count)
 
 @app.get("/api/folders")
 def folder_names():
