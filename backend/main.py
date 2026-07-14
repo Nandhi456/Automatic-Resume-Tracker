@@ -961,27 +961,4 @@ def reset():
 def progress():
 
     return JOB_STATUS
-"""
-@app.delete("/api/folders/{folder_name}")
-def delete_folder(folder_name: str):
 
-    folder_path = os.path.join(UPLOAD_DIR, folder_name)
-
-    if folder_name not in os.path.exists(folder_path):
-        raise HTTPException(status_code=404, detail="Folder not found")
-
-    shutil.rmtree(folder_path)
-
-    LAST_RESULT.pop(folder_name, None)
-
-    global RECENT_FILES
-
-    RECENT_FILES = [
-        f for f in RECENT_FILES
-        if f.get("folder_name") != folder_name
-    ]
-
-    return {
-        "success": True,
-        "message": f"{folder_name} deleted successfully."
-    }"""
