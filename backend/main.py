@@ -774,27 +774,6 @@ def extract_zip_file(payload: ExtractRequest):
         folder_name=destination_name,
         file_count=file_count)
 
-@app.get("/api/folders")
-def folder_names():
-
-    folders = []
-
-    if os.path.exists(UPLOAD_DIR):
-
-        for f in os.listdir(UPLOAD_DIR):
-
-            path = os.path.join(UPLOAD_DIR, f)
-
-            if os.path.isdir(path):
-                folders.append({
-                    "folder_name": f,
-                    "file_count": len(os.listdir(path))
-                })
-
-    return folders
-
-
-
 @app.get("/api/recent_files")
 def recent_files():
 
