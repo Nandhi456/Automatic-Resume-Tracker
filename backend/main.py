@@ -766,7 +766,7 @@ def extract_zip_file(payload: ExtractRequest):
         zip_ref.extractall(extract_path)
 
     file_count = len(os.listdir(extract_path))
-
+ 
     return ExtractResponse(
         folder_name=destination_name,
         file_count=file_count
