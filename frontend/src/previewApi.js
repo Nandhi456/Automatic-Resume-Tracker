@@ -1,5 +1,5 @@
-const API_BASE = "https://automatic-resume-tracker-msmq.vercel.app";
-//const API_BASE = "https://automatic-resume-tracker-gawfebbdrqjj88blvrysmr.streamlit.app";
+//const API_BASE = "https://automatic-resume-tracker-msmq.vercel.app";
+const API_BASE = "https://automatic-resume-tracker-gawfebbdrqjj88blvrysmr.streamlit.app";
 //const API_BASE = "https://automatic-resume-tracker-art.fastapicloud.dev";
 
 async function request(path, options = {}) {
