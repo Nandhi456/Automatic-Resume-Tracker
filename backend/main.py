@@ -18,7 +18,6 @@ from datetime import datetime
 
 
 
-
 app = FastAPI(title="Resume Tracker API")
 
 @app.get("/healthz")
