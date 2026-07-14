@@ -7,7 +7,7 @@
       "root": "backend/",
       "entrypoint": "main:app"
     }
-  },
+  }, 
   "rewrites": [
     {
       "source": "/main(/.*)?",
