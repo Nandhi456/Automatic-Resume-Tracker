@@ -6,7 +6,7 @@ import pandas as pd
 #import spacy
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from schemas import (ExtractRequest, ExtractResponse, FolderFile, RecentFiles, Statistics, PreviewData, SearchRequest)
+from schemas import (ExtractRequest, ExtractResponse, FolderFile, Statistics, PreviewData, SearchRequest)
 import pymupdf 
 import zipfile
 import shutil
