@@ -23,7 +23,7 @@ app = FastAPI(title="Resume Tracker API")
  
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "https://automatic-resume-tracker.vercel.app"],  
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "https://automatic-resume-tracker.vercel.app/"],  
     allow_methods=["*"],
     allow_headers=["*"],
 )
