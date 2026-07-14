@@ -1,41 +1,33 @@
-const API_BASE = "https://automatic-resume-tracker-art.fastapicloud.dev/";
+const API_BASE = "https://automatic-resume-tracker-art.fastapicloud.dev";
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, options);
-
   if (!response.ok) {
     let error = {};
     try {
       error = await response.json();
     } catch {}
-
     throw new Error(error.detail || `HTTP ${response.status}`);
   }
-
   return response.json();
 }
 
 /* ---------------------- Upload ZIP ---------------------- */
-
 export async function uploadZip(file) {
     const form = new FormData();
     form.append("file", file);
-
-    const res = await fetch(`${API_BASE}/upload`, {
+    const res = await fetch(`${API_BASE}/api/upload`, {
         method: "POST",
         body: form,
     });
-
     if (!res.ok)
         throw new Error(await res.text());
-
     return res.json();
 }
 
 /* ---------------------- Extract ZIP ---------------------- */
-
 export async function extractZip(folderName, destinationName = "") {
-  return request("/extract", {
+  return request("/api/extract", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -48,33 +40,28 @@ export async function extractZip(folderName, destinationName = "") {
 }
 
 /* ---------------------- Folder List ---------------------- */
-
 export async function listFolders() {
-  return request("/folders");
+  return request("/api/folders");
 }
 
 /* ---------------------- Recent Files ---------------------- */
-
 export async function getRecentFiles() {
-  return request("/recent_files");
+  return request("/api/recent_files");
 }
 
 /* ---------------------- Statistics ---------------------- */
-
 export async function getStatistics() {
-  return request("/statistics");
+  return request("/api/statistics");
 }
 
 /* ---------------------- Preview ---------------------- */
-
 export async function getPreview(folderName) {
-  return request(`/${encodeURIComponent(folderName)}/preview`);
+  return request(`/api/${encodeURIComponent(folderName)}/preview`);
 }
 
 /* ---------------------- Search ---------------------- */
-
 export async function searchPreview(folderName, keyword) {
-  return request(`/${encodeURIComponent(folderName)}/search`, {
+  return request(`/api/${encodeURIComponent(folderName)}/search`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -86,34 +73,35 @@ export async function searchPreview(folderName, keyword) {
 }
 
 /* ---------------------- Export Excel ---------------------- */
-
 export function exportUrl(folderName) {
-  return `${API_BASE}/${encodeURIComponent(
+  return `${API_BASE}/api/${encodeURIComponent(
     folderName
   )}/export_to_excel`;
 }
 
-/* ---------------------- Open Recent File ---------------------- */
-
+/* ---------------------- Reset ---------------------- */
 export async function resetApplication() {
-  return request("/reset", {
+  return request("/api/reset", {
     method: "POST",
   });
 }
 
+/* ---------------------- Open Recent File ---------------------- */
 export function openRecentFile(path) {
     window.open(
-        `${API_BASE}/open?path=${encodeURIComponent(path)}`,
+        `${API_BASE}/api/open?path=${encodeURIComponent(path)}`,
         "_blank"
     );
 }
 
+/* ---------------------- Progress ---------------------- */
 export async function getProgress() {
-    return request("/progress");
+    return request("/api/progress");
 }
+
 /*
 export async function deleteFolder(folder_name) {
-    return request(`/folders/${encodeURIComponent(folder_name)}`, {
+    return request(`/api/folders/${encodeURIComponent(folder_name)}`, {
         method: "DELETE",
     });
 }*/
