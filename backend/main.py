@@ -738,7 +738,7 @@ def process_resumes(folder_path):
 
 
 @app.post("/api/upload")
-async def upload_zip_file(file: UploadFile = File(...)):
+def upload_zip_file(file: UploadFile = File(...)):
 
     zip_path = os.path.join(UPLOAD_DIR, file.filename)
 
