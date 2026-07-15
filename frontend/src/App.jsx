@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { Folder, FileSpreadsheet, Loader2 } from "lucide-react"; 
 import Preview from "./preview";
-import {uploadZip, extractZip, listFolders,getPreview, getRecentFiles, openRecentFile, getStatistics, resetApplication, getProgress, getUploadUrl, uploadToB2} from "./previewApi";
+import {uploadZip, extractZip, listFolders,getPreview, getRecentFiles, openRecentFile, getStatistics, resetApplication, getProgress} from "./previewApi";
 
 const container = {
   height: "100vh",
@@ -469,11 +469,10 @@ if (folderExists) {
     return;
 }
 
-const { upload_url, filename } = await getUploadUrl(zipFile.name);
-await uploadToB2(upload_url, zipFile);
+const uploaded = await uploadZip(zipFile);
 
 await extractZip(
-    filename.replace(".zip", ""),
+    uploaded.filename.replace(".zip", ""),
     targetFolder
 );
 
