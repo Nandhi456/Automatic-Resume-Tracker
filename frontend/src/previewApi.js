@@ -17,15 +17,24 @@ async function request(path, options = {}) {
 
 /* ---------------------- Upload ZIP ---------------------- */
 export async function uploadZip(file) {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(`${API_BASE}/api/upload`, {
-        method: "POST",
-        body: form,
+    // Step 1: ask backend for a presigned B2 upload URL
+    const { upload_url, filename } = await request(
+        `/api/get_upload_url?filename=${encodeURIComponent(file.name)}`
+    );
+
+    // Step 2: upload the raw file directly to B2 (browser -> B2, skips your Vercel function)
+    const uploadRes = await fetch(upload_url, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": "application/zip" },
     });
-    if (!res.ok)
-        throw new Error(await res.text());
-    return res.json();
+
+    if (!uploadRes.ok) {
+        throw new Error("Direct upload to storage failed");
+    }
+
+    // Keep the same return shape your component already expects
+    return { filename };
 }
 
 /* ---------------------- Extract ZIP ---------------------- */
