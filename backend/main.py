@@ -741,7 +741,7 @@ def process_resumes(folder_path):
 
 
 @app.get("/api/folders")
-def folder_names():
+async def folder_names():
     folders = []
     if os.path.exists(UPLOAD_DIR):
         for f in os.listdir(UPLOAD_DIR):
@@ -755,7 +755,7 @@ def folder_names():
 
 
 @app.post("/api/extract")
-def extract_zip_file(payload: ExtractRequest):
+async def extract_zip_file(payload: ExtractRequest):
 
     folder_name = payload.folder_name
     destination_name = payload.destination_name or folder_name
@@ -775,7 +775,7 @@ def extract_zip_file(payload: ExtractRequest):
         file_count=file_count)
 
 @app.get("/api/recent_files")
-def recent_files():
+async def recent_files():
 
     files = []
 
@@ -803,7 +803,7 @@ def recent_files():
     return files
 
 @app.get("/api/statistics")
-def statistics():
+async def statistics():
 
     return {
         "job_id": "latest",
@@ -815,12 +815,12 @@ def statistics():
 
 
 @app.get("/api/generate")
-def folders(folder_name: str):
+async def folders(folder_name: str):
     return {"folder_name": folder_name, "status": "ready"}
 
 
 @app.get("/api/{folder_name}/preview", response_model=PreviewData)
-def preview(folder_name: str):
+async def preview(folder_name: str):
 
     folder_path = os.path.join(UPLOAD_DIR, folder_name)
 
@@ -833,7 +833,7 @@ def preview(folder_name: str):
     return data
 
 @app.post("/api/{folder_name}/search")
-def search(folder_name: str, payload: SearchRequest):
+async def search(folder_name: str, payload: SearchRequest):
 
     try:
 
@@ -870,7 +870,7 @@ def search(folder_name: str, payload: SearchRequest):
 
 
 @app.get("/api/{folder_name}/export_to_excel")
-def export_to_excel(folder_name: str):
+async def export_to_excel(folder_name: str):
 
     folder_path = os.path.join(UPLOAD_DIR, folder_name)
 
@@ -898,7 +898,7 @@ def export_to_excel(folder_name: str):
     )
 
 @app.get("/api/open")
-def open_file(path: str):
+async def open_file(path: str):
 
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -906,7 +906,7 @@ def open_file(path: str):
     return FileResponse(path)
 
 @app.post("/api/reset")
-def reset():
+async def reset():
 
     LAST_RESULT.clear()
 
@@ -937,7 +937,7 @@ def reset():
             }
 
 @app.get("/api/progress")
-def progress():
+async def progress():
 
     return JOB_STATUS
 
