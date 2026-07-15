@@ -751,6 +751,18 @@ def process_resumes(folder_path):
     "failed_files": len(failed_files),
 }
 
+@app.get("/api/get_upload_url")
+async def get_upload_url(filename: str):
+    try:
+        presigned_url = s3.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": B2_BUCKET_NAME, "Key": filename},
+            ExpiresIn=3600,
+        )
+        return {"upload_url": presigned_url, "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate URL: {e}")
+        
 @app.post("/api/upload")
 async def upload_zip(file: UploadFile = File(...)):
 
