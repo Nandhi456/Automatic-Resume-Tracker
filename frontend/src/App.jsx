@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState, useRef, useEffect } from "react";
 import { Folder, FileSpreadsheet, Loader2 } from "lucide-react"; 
 import Preview from "./preview";
-import {uploadZip, extractZip, listFolders,getPreview, getRecentFiles, openRecentFile, getStatistics, resetApplication, getProgress} from "./previewApi";
+import {uploadZip, extractZip, listFolders,getPreview, getRecentFiles, openRecentFile, getStatistics, resetApplication, getProgress, getUploadUrl, uploadToB2} from "./previewApi";
 
 const container = {
   height: "100vh",
