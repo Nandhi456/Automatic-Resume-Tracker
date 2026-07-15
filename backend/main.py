@@ -18,6 +18,7 @@ from datetime import datetime
 import boto3
 from botocore.config import Config
 import io
+import traceback
 
 app = FastAPI(title="Resume Tracker API")
 
@@ -795,30 +796,47 @@ async def folder_names():
                 })
     return folders
 
-
 @app.post("/api/extract")
-async def extract_zip_file(payload: ExtractRequest):
-
-    folder_name = payload.folder_name
-    destination_name = payload.destination_name or folder_name
-
+async def extract_zip_file(req: ExtractRequest):
     try:
-        obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
-        zip_bytes = obj["Body"].read()
+        print("========== EXTRACT START ==========")
+        print("Folder:", req.folder_name)
+        print("Destination:", req.destination_name)
+
+        zip_key = req.folder_name + ".zip"
+        print("ZIP KEY:", zip_key)
+
+        zip_path = f"/tmp/{zip_key}"
+        extract_path = f"/tmp/{req.destination_name or req.folder_name}"
+
+        print("Downloading from B2...")
+
+        s3.download_file(
+            Bucket=B2_BUCKET_NAME,
+            Key=zip_key,
+            Filename=zip_path
+        )
+
+        print("Downloaded:", zip_path)
+
+        os.makedirs(extract_path, exist_ok=True)
+
+        print("Extracting...")
+
+        with zipfile.ZipFile(zip_path, "r") as z:
+            z.extractall(extract_path)
+
+        print("Extraction completed")
+
+        return {"success": True}
+
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Zip not found in B2: {e}")
+        traceback.print_exc()
 
-    extract_path = os.path.join(UPLOAD_DIR, destination_name)
-    os.makedirs(extract_path, exist_ok=True)
-
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
-        zip_ref.extractall(extract_path)
-
-    file_count = len(os.listdir(extract_path))
-
-    return ExtractResponse(
-        folder_name=destination_name,
-        file_count=file_count)
+        return {
+            "error": str(e),
+            "type": type(e).__name__,
+        }
 
 @app.get("/api/recent_files")
 async def recent_files():
