@@ -13,4 +13,4 @@ docx2txt==0.9
 #onnxruntime==1.23.2
 PyMuPDF==1.28.0
 streamlit==1.59.2
-boto3==1.43.48
+boto3>=1.40,<2.0
