@@ -15,8 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from datetime import datetime
-
-
+import boto3
+import io
 
 app = FastAPI(title="Resume Tracker API")
 
@@ -29,6 +29,18 @@ app.add_middleware(
     allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "https://automatic-resume-tracker.vercel.app", "https://automatic-resume-tracker-owtq.vercel.app"],  
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+B2_KEY_ID = os.environ["B2_KEY_ID"]
+B2_APPLICATION_KEY = os.environ["B2_APPLICATION_KEY"]
+B2_BUCKET_NAME = os.environ["B2_BUCKET_NAME"]
+B2_ENDPOINT = os.environ["B2_ENDPOINT"]
+
+s3 = boto3.client(
+    "s3",
+    endpoint_url=f"https://{B2_ENDPOINT}",
+    aws_access_key_id=B2_KEY_ID,
+    aws_secret_access_key=B2_APPLICATION_KEY,
 )
 
 UPLOAD_DIR = "/tmp/uploads"
@@ -745,13 +757,10 @@ async def upload_zip(file: UploadFile = File(...)):
     if not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only .zip files are allowed")
 
-    zip_path = os.path.join(UPLOAD_DIR, file.filename)
-
     try:
-        with open(zip_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        s3.upload_fileobj(file.file, B2_BUCKET_NAME, file.filename)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload to B2: {e}")
 
     return {
         "filename": file.filename,
@@ -779,16 +788,20 @@ async def extract_zip_file(payload: ExtractRequest):
     folder_name = payload.folder_name
     destination_name = payload.destination_name or folder_name
 
-    zip_path = os.path.join(UPLOAD_DIR, folder_name + ".zip")
-    extract_path = os.path.join(UPLOAD_DIR, destination_name)
+    try:
+        obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
+        zip_bytes = obj["Body"].read()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Zip not found in B2: {e}")
 
+    extract_path = os.path.join(UPLOAD_DIR, destination_name)
     os.makedirs(extract_path, exist_ok=True)
 
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
         zip_ref.extractall(extract_path)
 
     file_count = len(os.listdir(extract_path))
- 
+
     return ExtractResponse(
         folder_name=destination_name,
         file_count=file_count)
