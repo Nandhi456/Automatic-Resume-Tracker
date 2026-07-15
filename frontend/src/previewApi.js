@@ -1,5 +1,5 @@
-//const API_BASE = "https://automatic-resume-tracker-msmq.vercel.app";
-const API_BASE = "https://automatic-resume-tracker.streamlit.app";
+const API_BASE = "https://automatic-resume-tracker-msmq.vercel.app";
+//const API_BASE = "https://automatic-resume-tracker.streamlit.app";
 //const API_BASE = "https://automatic-resume-tracker-art.fastapicloud.dev";
 //const API_BASE = "https://automatic-resume-tracker-owtq.vercel.app";
 
