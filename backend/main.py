@@ -739,6 +739,25 @@ def process_resumes(folder_path):
     "failed_files": len(failed_files),
 }
 
+@app.post("/api/upload")
+async def upload_zip(file: UploadFile = File(...)):
+
+    if not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only .zip files are allowed")
+
+    zip_path = os.path.join(UPLOAD_DIR, file.filename)
+
+    try:
+        with open(zip_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+
+    return {
+        "filename": file.filename,
+        "folder_name": file.filename.rsplit(".zip", 1)[0],
+        "message": "Upload successful"
+    }
 
 @app.get("/api/folders")
 async def folder_names():
