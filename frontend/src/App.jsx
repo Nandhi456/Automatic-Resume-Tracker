@@ -450,7 +450,7 @@ export default function AutomaticResumeTracker() {
   try {
     setIsExtracting(true);
     setPercentage(10);
-    setPercentage(40);
+    //setPercentage(40);
   
     // check existing folders first
 const existingFolders = await listFolders();
@@ -469,10 +469,11 @@ if (folderExists) {
     return;
 }
 
-const uploaded = await uploadZip(zipFile);
+const { upload_url, filename } = await getUploadUrl(zipFile.name);
+await uploadToB2(upload_url, zipFile);
 
 await extractZip(
-    uploaded.filename.replace(".zip", ""),
+    filename.replace(".zip", ""),
     targetFolder
 );
 
