@@ -16,6 +16,7 @@ from pathlib import Path
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 from datetime import datetime
 import boto3
+from botocore.config import Config
 import io
 
 app = FastAPI(title="Resume Tracker API")
@@ -41,6 +42,7 @@ s3 = boto3.client(
     endpoint_url=f"https://{B2_ENDPOINT}",
     aws_access_key_id=B2_KEY_ID,
     aws_secret_access_key=B2_APPLICATION_KEY,
+    config=Config(signature_version="s3v4"),
 )
 
 UPLOAD_DIR = "/tmp/uploads"
