@@ -913,19 +913,7 @@ async def reset():
     APP_STATS["total"] = 0
     APP_STATS["processed"] = 0
     APP_STATS["failed"] = 0
-
-    # Clear local /tmp (still useful for preview scratch space)
-    if os.path.exists(UPLOAD_DIR):
-        for item in os.listdir(UPLOAD_DIR):
-            path = os.path.join(UPLOAD_DIR, item)
-            try:
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
-                else:
-                    os.remove(path)
-            except Exception as e:
-                print(e)
-
+    
     # Clear everything in B2 bucket (uploaded zips + extracted files)
     try:
         paginator = s3.get_paginator("list_objects_v2")
