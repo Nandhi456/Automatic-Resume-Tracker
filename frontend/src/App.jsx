@@ -502,17 +502,11 @@ await loadRecentFiles();
   }
 };
 
-  function updateSteps(message) {
-    setProcessingSteps([
-        {
-            name: "Reading Resume",
-            done: message !== ""
-        },
-        {
-            name: "Extracting Text",
-            done: message.includes("Extracting")
-        }, 
-    ]);
+  function updateSteps(status, progressValue) {
+  setProcessingSteps([
+    { name: "Reading Resume", done: progressValue > 0 },
+    { name: "Extracting Text", done: status === "done" || progressValue >= 70 },
+  ]);
 }
 
   const handleGenerate = async (folderName) => {
@@ -521,16 +515,16 @@ await loadRecentFiles();
         setReadingFolder(folderName);
         setProcessing(true);
         interval = setInterval(async () => {
-            const p = await getProgress();
-            setProgress(p.progress);
-            setProgressMessage(p.message);
-            setCurrentFile(p.current_file || "");
-            // Update processing steps
-            updateSteps(p.message);
-            if (p.status === "done") {
-                clearInterval(interval);
-            }
+        const p = await getProgress();
+        setProgress(p.progress);
+        setProgressMessage(p.message);
+        setCurrentFile(p.current_file || "");
+        updateSteps(p.status, p.progress);
+        if (p.status === "done") {
+           clearInterval(interval);
+          }
         }, 300);
+      
         const preview = await getPreview(folderName);
         setPreviewData(preview);
         setPreviewFolder(folderName);
