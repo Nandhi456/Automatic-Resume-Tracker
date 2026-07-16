@@ -73,10 +73,10 @@ JOB_STATUS = {
 #nlp = spacy.load("en_core_web_sm")
 
 
-def extract_text_from_pdf(path):
+def extract_text_from_pdf(file_bytes):
     text = ""
     try:
-        doc = pymupdf.open(path)
+        doc = pymupdf.open(stream=file_bytes, filetype="pdf")
         for page in doc:
             text += page.get_text()
         doc.close()
@@ -85,9 +85,9 @@ def extract_text_from_pdf(path):
     return text.strip()
 
 
-def extract_text_from_docx(path):
+def extract_text_from_docx(file_bytes):
     try:
-        doc = docx.Document(path)
+        doc = docx.Document(io.BytesIO(file_bytes))
         return "\n".join([p.text for p in doc.paragraphs]).strip()
     except:
         return ""
@@ -579,54 +579,30 @@ def clean_excel_text(value):
         value = value.strip()
     return value
 
-def process_resumes(folder_path):
-    files = os.listdir(folder_path)
-    raw_data=[]
-    failed_files=[]
+def process_resumes(files_data):
+    # files_data: list of (filename, file_bytes) tuples
+    raw_data = []
+    failed_files = []
 
-    files=os.listdir(folder_path)
+    total = len(files_data)
 
-# Handle ZIPs that extract into a nested folder
-    if len(files) == 1:
-       nested = os.path.join(folder_path, files[0])
-
-       if os.path.isdir(nested):
-        folder_path = nested
-        #files = os.listdir(folder_path)
-        #raw_data = []
-        #failed_files = []
-
-    files = os.listdir(folder_path)
-    total=len(files)
-
-    if not files:
-       JOB_STATUS["status"] = "done"
-       JOB_STATUS["progress"] = 100
-
+    if not files_data:
+        JOB_STATUS["status"] = "done"
+        JOB_STATUS["progress"] = 100
 
     JOB_STATUS["status"] = "processing"
 
-    for i, file in enumerate(files):
+    for i, (file, file_bytes) in enumerate(files_data):
 
-        JOB_STATUS["progress"] = int((i / total) * 100)
+        JOB_STATUS["progress"] = int((i / total) * 100) if total else 100
         JOB_STATUS["current_file"] = file
         JOB_STATUS["message"] = f"Reading {file}"
-
-   # print(f"📁 Found {len(files)} files\n")
-
-        path = os.path.join(folder_path, file)
-
-        if os.path.isdir(path):
-            continue
-
-       # print(f"📄 Processing: {file}")
         JOB_STATUS["message"] = "Extracting text..."
 
-        # ---- Extract text ----
-        if file.endswith(".pdf"):
-            text = extract_text_from_pdf(path)
-        elif file.endswith(".docx"):
-            text = extract_text_from_docx(path)
+        if file.lower().endswith(".pdf"):
+            text = extract_text_from_pdf(file_bytes)
+        elif file.lower().endswith(".docx"):
+            text = extract_text_from_docx(file_bytes)
         else:
             failed_files.append((file, "Unsupported format"))
             continue
@@ -635,7 +611,6 @@ def process_resumes(folder_path):
             failed_files.append((file, "No readable text"))
             continue
 
-        # ---- Extract fields ----
         name = extract_name(text)
         email = extract_email(text)
         phone = extract_phone(text)
@@ -649,11 +624,9 @@ def process_resumes(folder_path):
 
         JOB_STATUS["message"] = "Extracting candidate details..."
 
-        # ---- Clean invalid values ----
         if len(name) > 40 or name.lower() in ["resume", "curriculum vitae"]:
             name = ""
 
-        # ---- Confidence Score ----
         score = 0
         if name: score += 1
         if email: score += 1
@@ -676,103 +649,52 @@ def process_resumes(folder_path):
 
         raw_data.append(row)
 
-    # ===============================
-    # ✅ RAW DATAFRAME (Before cleaning)
-    # ===============================
     raw_df = pd.DataFrame(raw_data)
     if raw_df.empty:
-      return {
-        "folder_name": folder_path,
-        "columns": [],
-        "rows": [],
-        "total_files": len(files),
-        "raw_records": 0,
-        "cleaned_records": 0,
-        "removed": 0,
-        "failed_files": len(failed_files),
-    }
-
-   # print(f"\n📊 Raw extracted records: {len(raw_df)}")
-
-    # ===============================
-    # ✅ CLEANING PIPELINE
-    # ===============================
+        return {
+            "folder_name": "",
+            "columns": [],
+            "rows": [],
+            "total_files": total,
+            "raw_records": 0,
+            "cleaned_records": 0,
+            "removed": 0,
+            "failed_files": len(failed_files),
+        }
 
     JOB_STATUS["progress"] = 70
     JOB_STATUS["message"] = "Cleaning extracted data..."
 
     clean_df = raw_df.copy()
-
-    # 1. Remove low-quality records
     clean_df = clean_df[clean_df["Score"] >= 2]
-
-    # 2. Ensure at least email OR phone exists
-    clean_df = clean_df[
-        (clean_df["Email"] != "") | (clean_df["Phone"] != "")
-    ]
-
-    # 3. Remove invalid experience
+    clean_df = clean_df[(clean_df["Email"] != "") | (clean_df["Phone"] != "")]
     clean_df = clean_df[(clean_df["Experience"] >= 0) & (clean_df["Experience"] <= 40)]
-
-    # 4. Remove empty names if email also weak
     clean_df = clean_df[~((clean_df["Name"] == "") & (clean_df["Email"] == ""))]
-
-    # 5. Remove duplicates (email priority, then phone)
     clean_df = clean_df.sort_values(by="Score", ascending=False)
-
     clean_df = clean_df.drop_duplicates(subset=["Email"], keep="first")
     clean_df = clean_df.drop_duplicates(subset=["Phone"], keep="first")
-
-    # 6. Final cleanup (strip spaces)
-    clean_df = clean_df.map(
-    lambda x: x.strip() if isinstance(x, str) else x
-)
-
-    # ===============================
-    # ✅ ADD SERIAL NUMBER
-    # ===============================
+    clean_df = clean_df.map(lambda x: x.strip() if isinstance(x, str) else x)
     clean_df.insert(0, "S.No", range(1, len(clean_df) + 1))
 
-    
-
-    # ===============================
-    # ✅ SAVE CLEAN OUTPUT
-    # ===============================
-
-    # ===============================
-    # ✅ PROCESSING REPORT
-    # ===============================
-    report = pd.DataFrame({
-        "Failed File": [f[0] for f in failed_files],
-        "Reason": [f[1] for f in failed_files]
-    })
-
-    
-
-    APP_STATS["total"] = len(files)
+    APP_STATS["total"] = total
     APP_STATS["processed"] = len(clean_df)
     APP_STATS["failed"] = len(failed_files)
 
-    
     JOB_STATUS["progress"] = 100
     JOB_STATUS["status"] = "done"
     JOB_STATUS["message"] = "Completed"
 
-
-    # ===============================
-    # ✅ SUMMARY
-    # ===============================
     return {
-    "folder_name": folder_path,
-    "columns": clean_df.columns.tolist(),
-    "rows": clean_df.to_dict(orient="records"),
-    "total_files": len(files),
-    "raw_records": len(raw_df),
-    "cleaned_records": len(clean_df),
-    "removed": len(raw_df) - len(clean_df),
-    "failed_files": len(failed_files),
-}
-
+        "folder_name": "",
+        "columns": clean_df.columns.tolist(),
+        "rows": clean_df.to_dict(orient="records"),
+        "total_files": total,
+        "raw_records": len(raw_df),
+        "cleaned_records": len(clean_df),
+        "removed": len(raw_df) - len(clean_df),
+        "failed_files": len(failed_files),
+    }
+    
 @app.get("/api/get_upload_url")
 async def get_upload_url(filename: str):
     try:
@@ -785,22 +707,6 @@ async def get_upload_url(filename: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate URL: {e}")
         
-@app.post("/api/upload")
-async def upload_zip(file: UploadFile = File(...)):
-
-    if not file.filename.lower().endswith(".zip"):
-        raise HTTPException(status_code=400, detail="Only .zip files are allowed")
-
-    try:
-        s3.upload_fileobj(file.file, B2_BUCKET_NAME, file.filename)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload to B2: {e}")
-
-    return {
-        "filename": file.filename,
-        "folder_name": file.filename.rsplit(".zip", 1)[0],
-        "message": "Upload successful"
-    }
 
 @app.post("/api/extract")
 async def extract_zip_file(payload: ExtractRequest):
@@ -904,11 +810,8 @@ async def folders(folder_name: str):
 @app.get("/api/{folder_name}/preview", response_model=PreviewData)
 async def preview(folder_name: str):
     try:
-        temp_dir = os.path.join(UPLOAD_DIR, "_preview_" + folder_name)
-        os.makedirs(temp_dir, exist_ok=True)
-
         prefix = f"extracted/{folder_name}/"
-        found_any = False
+        files_data = []
 
         paginator = s3.get_paginator("list_objects_v2")
         for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix=prefix):
@@ -917,28 +820,24 @@ async def preview(folder_name: str):
                 filename = key.split("/")[-1]
                 if not filename:
                     continue
-                found_any = True
-                local_path = os.path.join(temp_dir, filename)
-                s3.download_file(B2_BUCKET_NAME, key, local_path)
+                file_obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=key)
+                file_bytes = file_obj["Body"].read()
+                files_data.append((filename, file_bytes))
 
-        if not found_any:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        if not files_data:
             return {"error": "Folder not found"}
 
-        data = process_resumes(temp_dir)
-        data["folder_name"] = folder_name  # fix: return original name, not local temp path
+        data = process_resumes(files_data)
+        data["folder_name"] = folder_name
         LAST_RESULT[folder_name] = data
         save_result_to_b2(folder_name, data)
-
-
-        shutil.rmtree(temp_dir, ignore_errors=True)
 
         return data
 
     except Exception as e:
         error_detail = traceback.format_exc()
         print("PREVIEW ERROR:", error_detail)
-        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}\n\n{error_detail}")
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}\n\n{error_detail}") 
         
 @app.post("/api/{folder_name}/search")
 async def search(folder_name: str, payload: SearchRequest):
