@@ -783,60 +783,58 @@ async def upload_zip(file: UploadFile = File(...)):
         "message": "Upload successful"
     }
 
-@app.get("/api/folders")
-async def folder_names():
-    folders = []
-    if os.path.exists(UPLOAD_DIR):
-        for f in os.listdir(UPLOAD_DIR):
-            path = os.path.join(UPLOAD_DIR, f)
-            if os.path.isdir(path):
-                folders.append({
-                    "folder_name": f,
-                    "file_count": len(os.listdir(path))   # <-- one extra listdir per folder
-                })
-    return folders
 
 @app.post("/api/extract")
-async def extract_zip_file(req: ExtractRequest):
+async def extract_zip_file(payload: ExtractRequest):
+
+    folder_name = payload.folder_name
+    destination_name = payload.destination_name or folder_name
+
     try:
-        print("========== EXTRACT START ==========")
-        print("Folder:", req.folder_name)
-        print("Destination:", req.destination_name)
-
-        zip_key = req.folder_name + ".zip"
-        print("ZIP KEY:", zip_key)
-
-        zip_path = f"/tmp/{zip_key}"
-        extract_path = f"/tmp/{req.destination_name or req.folder_name}"
-
-        print("Downloading from B2...")
-
-        s3.download_file(
-            Bucket=B2_BUCKET_NAME,
-            Key=zip_key,
-            Filename=zip_path
-        )
-
-        print("Downloaded:", zip_path)
-
-        os.makedirs(extract_path, exist_ok=True)
-
-        print("Extracting...")
-
-        with zipfile.ZipFile(zip_path, "r") as z:
-            z.extractall(extract_path)
-
-        print("Extraction completed")
-
-        return {"success": True}
-
+        obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
+        zip_bytes = obj["Body"].read()
     except Exception as e:
-        traceback.print_exc()
+        raise HTTPException(status_code=404, detail=f"Zip not found in B2: {e}")
 
-        return {
-            "error": str(e),
-            "type": type(e).__name__,
-        }
+    temp_dir = os.path.join(UPLOAD_DIR, "_temp_" + destination_name)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
+        zip_ref.extractall(temp_dir)
+
+    # Handle nested single-folder zips
+    entries = os.listdir(temp_dir)
+    if len(entries) == 1 and os.path.isdir(os.path.join(temp_dir, entries[0])):
+        temp_dir = os.path.join(temp_dir, entries[0])
+
+    file_count = 0
+    for root, _, filenames in os.walk(temp_dir):
+        for fname in filenames:
+            local_path = os.path.join(root, fname)
+            b2_key = f"extracted/{destination_name}/{fname}"
+            s3.upload_file(local_path, B2_BUCKET_NAME, b2_key)
+            file_count += 1
+
+    shutil.rmtree(os.path.join(UPLOAD_DIR, "_temp_" + destination_name), ignore_errors=True)
+
+    return ExtractResponse(
+        folder_name=destination_name,
+        file_count=file_count)
+
+@app.get("/api/folders")
+async def folder_names():
+    folders = {}
+
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix="extracted/"):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            parts = key[len("extracted/"):].split("/")
+            if len(parts) >= 2 and parts[1]:
+                folder = parts[0]
+                folders[folder] = folders.get(folder, 0) + 1
+
+    return [{"folder_name": name, "file_count": count} for name, count in folders.items()]
 
 @app.get("/api/recent_files")
 async def recent_files():
