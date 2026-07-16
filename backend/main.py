@@ -795,33 +795,35 @@ async def extract_zip_file(payload: ExtractRequest):
     try:
         obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
         zip_bytes = obj["Body"].read()
+
+        temp_dir = os.path.join(UPLOAD_DIR, "_temp_" + destination_name)
+        os.makedirs(temp_dir, exist_ok=True)
+
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        entries = os.listdir(temp_dir)
+        if len(entries) == 1 and os.path.isdir(os.path.join(temp_dir, entries[0])):
+            temp_dir = os.path.join(temp_dir, entries[0])
+
+        file_count = 0
+        for root, _, filenames in os.walk(temp_dir):
+            for fname in filenames:
+                local_path = os.path.join(root, fname)
+                b2_key = f"extracted/{destination_name}/{fname}"
+                s3.upload_file(local_path, B2_BUCKET_NAME, b2_key)
+                file_count += 1
+
+        shutil.rmtree(os.path.join(UPLOAD_DIR, "_temp_" + destination_name), ignore_errors=True)
+
+        return ExtractResponse(
+            folder_name=destination_name,
+            file_count=file_count)
+
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Zip not found in B2: {e}")
-
-    temp_dir = os.path.join(UPLOAD_DIR, "_temp_" + destination_name)
-    os.makedirs(temp_dir, exist_ok=True)
-
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
-        zip_ref.extractall(temp_dir)
-
-    # Handle nested single-folder zips
-    entries = os.listdir(temp_dir)
-    if len(entries) == 1 and os.path.isdir(os.path.join(temp_dir, entries[0])):
-        temp_dir = os.path.join(temp_dir, entries[0])
-
-    file_count = 0
-    for root, _, filenames in os.walk(temp_dir):
-        for fname in filenames:
-            local_path = os.path.join(root, fname)
-            b2_key = f"extracted/{destination_name}/{fname}"
-            s3.upload_file(local_path, B2_BUCKET_NAME, b2_key)
-            file_count += 1
-
-    shutil.rmtree(os.path.join(UPLOAD_DIR, "_temp_" + destination_name), ignore_errors=True)
-
-    return ExtractResponse(
-        folder_name=destination_name,
-        file_count=file_count)
+        error_detail = traceback.format_exc()
+        print("EXTRACT ERROR:", error_detail)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}\n\n{error_detail}")
 
 @app.get("/api/folders")
 async def folder_names():
