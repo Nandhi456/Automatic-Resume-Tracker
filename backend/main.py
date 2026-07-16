@@ -785,7 +785,6 @@ async def upload_zip(file: UploadFile = File(...)):
         "message": "Upload successful"
     }
 
-
 @app.post("/api/extract")
 async def extract_zip_file(payload: ExtractRequest):
 
@@ -796,25 +795,31 @@ async def extract_zip_file(payload: ExtractRequest):
         obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
         zip_bytes = obj["Body"].read()
 
-        temp_dir = os.path.join(UPLOAD_DIR, "_temp_" + destination_name)
-        os.makedirs(temp_dir, exist_ok=True)
-
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
-            zip_ref.extractall(temp_dir)
-
-        entries = os.listdir(temp_dir)
-        if len(entries) == 1 and os.path.isdir(os.path.join(temp_dir, entries[0])):
-            temp_dir = os.path.join(temp_dir, entries[0])
-
         file_count = 0
-        for root, _, filenames in os.walk(temp_dir):
-            for fname in filenames:
-                local_path = os.path.join(root, fname)
-                b2_key = f"extracted/{destination_name}/{fname}"
-                s3.upload_file(local_path, B2_BUCKET_NAME, b2_key)
-                file_count += 1
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
+            names = zip_ref.namelist()
 
-        shutil.rmtree(os.path.join(UPLOAD_DIR, "_temp_" + destination_name), ignore_errors=True)
+            # Handle nested single-folder zips
+            top_level = set(n.split("/")[0] for n in names if n)
+            prefix_to_strip = ""
+            if len(top_level) == 1:
+                only_entry = list(top_level)[0]
+                if all(n.startswith(only_entry + "/") or n == only_entry for n in names):
+                    prefix_to_strip = only_entry + "/"
+
+            for name in names:
+                if name.endswith("/"):
+                    continue  # skip directory entries
+
+                file_bytes = zip_ref.read(name)
+                clean_name = name[len(prefix_to_strip):] if prefix_to_strip else name
+                filename_only = clean_name.split("/")[-1]
+                if not filename_only:
+                    continue
+
+                b2_key = f"extracted/{destination_name}/{filename_only}"
+                s3.upload_fileobj(io.BytesIO(file_bytes), B2_BUCKET_NAME, b2_key)
+                file_count += 1
 
         return ExtractResponse(
             folder_name=destination_name,
