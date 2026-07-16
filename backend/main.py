@@ -20,6 +20,8 @@ from botocore.config import Config
 import io
 import traceback
 from fastapi.responses import RedirectResponse
+from fastapi.responses import StreamingResponse
+import json
 
 
 app = FastAPI(title="Resume Tracker API")
@@ -90,7 +92,23 @@ def extract_text_from_docx(path):
     except:
         return ""
 
+def save_result_to_b2(folder_name, data):
+    try:
+        s3.put_object(
+            Bucket=B2_BUCKET_NAME,
+            Key=f"results/{folder_name}.json",
+            Body=json.dumps(data).encode("utf-8"),
+            ContentType="application/json",
+        )
+    except Exception as e:
+        print("SAVE RESULT ERROR:", e)
 
+def load_result_from_b2(folder_name):
+    try:
+        obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=f"results/{folder_name}.json")
+        return json.loads(obj["Body"].read().decode("utf-8"))
+    except Exception:
+        return None
 
 def extract_email(text):
     matches = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}", text)
@@ -174,7 +192,6 @@ def extract_name(text):
 
     return ""
 
-from datetime import datetime
 
 def extract_experience(text):
 
@@ -886,100 +903,95 @@ async def folders(folder_name: str):
 
 @app.get("/api/{folder_name}/preview", response_model=PreviewData)
 async def preview(folder_name: str):
+    try:
+        temp_dir = os.path.join(UPLOAD_DIR, "_preview_" + folder_name)
+        os.makedirs(temp_dir, exist_ok=True)
 
-    temp_dir = os.path.join(UPLOAD_DIR, "_preview_" + folder_name)
-    os.makedirs(temp_dir, exist_ok=True)
+        prefix = f"extracted/{folder_name}/"
+        found_any = False
 
-    prefix = f"extracted/{folder_name}/"
-    found_any = False
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                filename = key.split("/")[-1]
+                if not filename:
+                    continue
+                found_any = True
+                local_path = os.path.join(temp_dir, filename)
+                s3.download_file(B2_BUCKET_NAME, key, local_path)
 
-    paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix=prefix):
-        for obj in page.get("Contents", []):
-            key = obj["Key"]
-            filename = key.split("/")[-1]
-            if not filename:
-                continue
-            found_any = True
-            local_path = os.path.join(temp_dir, filename)
-            s3.download_file(B2_BUCKET_NAME, key, local_path)
+        if not found_any:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            return {"error": "Folder not found"}
 
-    if not found_any:
+        data = process_resumes(temp_dir)
+        data["folder_name"] = folder_name  # fix: return original name, not local temp path
+        LAST_RESULT[folder_name] = data
+        save_result_to_b2(folder_name, data)
+
+
         shutil.rmtree(temp_dir, ignore_errors=True)
-        return {"error": "Folder not found"}
 
-    data = process_resumes(temp_dir)
-    LAST_RESULT[folder_name] = data
+        return data
 
-    shutil.rmtree(temp_dir, ignore_errors=True)
-
-    return data
-
+    except Exception as e:
+        error_detail = traceback.format_exc()
+        print("PREVIEW ERROR:", error_detail)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {str(e)}\n\n{error_detail}")
+        
 @app.post("/api/{folder_name}/search")
 async def search(folder_name: str, payload: SearchRequest):
 
     try:
+        data = LAST_RESULT.get(folder_name) or load_result_from_b2(folder_name)
 
-        if folder_name not in LAST_RESULT:
+        if data is None:
             raise HTTPException(
                 status_code=400,
                 detail="Generate preview first."
             )
-
-        data = LAST_RESULT[folder_name]
 
         keyword = payload.keyword.lower().strip()
 
         matches = []
 
         for row in data["rows"]:
-
             if any(keyword in str(v).lower() for v in row.values()):
                 matches.append(row)
 
         return matches
-    
+
     except HTTPException:
-         raise
+        raise
 
     except Exception as e:
-
         print("SEARCH ERROR:", e)
-
         raise HTTPException(
             status_code=500,
             detail=str(e)
         )
 
-
 @app.get("/api/{folder_name}/export_to_excel")
 async def export_to_excel(folder_name: str):
 
-    folder_path = os.path.join(UPLOAD_DIR, folder_name)
+    data = LAST_RESULT.get(folder_name) or load_result_from_b2(folder_name)
 
-    if folder_name not in LAST_RESULT:
-       raise HTTPException(400, "Generate preview first")
-
-    data = LAST_RESULT[folder_name]
-
-    #data = process_resumes(folder_path)
+    if data is None:
+        raise HTTPException(400, "Generate preview first")
 
     df = pd.DataFrame(data["rows"])
 
-    export_path = os.path.join(
-        EXPORT_DIR,
+    excel_buffer = io.BytesIO()
+    df.to_excel(excel_buffer, index=False)
+    excel_buffer.seek(0)
 
-        f"{folder_name}.xlsx"
+    return StreamingResponse(
+        excel_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{folder_name}.xlsx"'}
     )
-
-    df.to_excel(export_path, index=False)
-
-    return FileResponse(
-        export_path,
-        filename=f"{folder_name}.xlsx",
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
+    
 @app.get("/api/open")
 async def open_file(path: str):
     try:
@@ -1006,12 +1018,10 @@ async def reset():
     APP_STATS["processed"] = 0
     APP_STATS["failed"] = 0
 
+    # Clear local /tmp (still useful for preview scratch space)
     if os.path.exists(UPLOAD_DIR):
-
         for item in os.listdir(UPLOAD_DIR):
-
             path = os.path.join(UPLOAD_DIR, item)
-
             try:
                 if os.path.isdir(path):
                     shutil.rmtree(path)
@@ -1020,8 +1030,20 @@ async def reset():
             except Exception as e:
                 print(e)
 
-    return {"message": "Application reset successfully"
-            }
+    # Clear everything in B2 bucket (uploaded zips + extracted files)
+    try:
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=B2_BUCKET_NAME):
+            objects_to_delete = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+            if objects_to_delete:
+                s3.delete_objects(
+                    Bucket=B2_BUCKET_NAME,
+                    Delete={"Objects": objects_to_delete}
+                )
+    except Exception as e:
+        print("B2 RESET ERROR:", e)
+
+    return {"message": "Application reset successfully"}
 
 @app.get("/api/progress")
 async def progress():
