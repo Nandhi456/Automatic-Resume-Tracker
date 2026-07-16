@@ -19,6 +19,8 @@ import boto3
 from botocore.config import Config
 import io
 import traceback
+from fastapi.responses import RedirectResponse
+
 
 app = FastAPI(title="Resume Tracker API")
 
@@ -838,27 +840,21 @@ async def folder_names():
 
 @app.get("/api/recent_files")
 async def recent_files():
-
     files = []
 
-    if not os.path.exists(UPLOAD_DIR):
-        return []
-    seen = set()
-
-
-    for root, _, filenames in os.walk(UPLOAD_DIR):
-        for filename in filenames:
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix="extracted/"):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            filename = key.split("/")[-1]
             if filename.lower().endswith((".pdf", ".docx")):
-                full_path = os.path.join(root, filename)
-                if full_path in seen:
-                   continue
-
-                seen.add(full_path)
+                parts = key[len("extracted/"):].split("/")
+                folder = parts[0] if parts else ""
                 files.append({
                     "filename": filename,
-                    "folder": os.path.basename(root),
-                    "path": full_path,
-                    "modified": os.path.getmtime(full_path)
+                    "folder": folder,
+                    "path": key,
+                    "modified": obj["LastModified"].timestamp()
                 })
 
     files.sort(key=lambda x: x["modified"], reverse=True)
@@ -884,13 +880,31 @@ async def folders(folder_name: str):
 @app.get("/api/{folder_name}/preview", response_model=PreviewData)
 async def preview(folder_name: str):
 
-    folder_path = os.path.join(UPLOAD_DIR, folder_name)
+    temp_dir = os.path.join(UPLOAD_DIR, "_preview_" + folder_name)
+    os.makedirs(temp_dir, exist_ok=True)
 
-    if not os.path.exists(folder_path):
+    prefix = f"extracted/{folder_name}/"
+    found_any = False
+
+    paginator = s3.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix=prefix):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
+            filename = key.split("/")[-1]
+            if not filename:
+                continue
+            found_any = True
+            local_path = os.path.join(temp_dir, filename)
+            s3.download_file(B2_BUCKET_NAME, key, local_path)
+
+    if not found_any:
+        shutil.rmtree(temp_dir, ignore_errors=True)
         return {"error": "Folder not found"}
 
-    data = process_resumes(folder_path)
+    data = process_resumes(temp_dir)
     LAST_RESULT[folder_name] = data
+
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
     return data
 
@@ -961,11 +975,15 @@ async def export_to_excel(folder_name: str):
 
 @app.get("/api/open")
 async def open_file(path: str):
-
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return FileResponse(path)
+    try:
+        url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": B2_BUCKET_NAME, "Key": path},
+            ExpiresIn=3600,
+        )
+        return RedirectResponse(url)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"File not found: {e}")
 
 @app.post("/api/reset")
 async def reset():
