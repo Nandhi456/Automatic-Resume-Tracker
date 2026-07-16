@@ -50,10 +50,7 @@ s3 = boto3.client(
     config=Config(signature_version="s3v4"),
 )
 
-UPLOAD_DIR = "/tmp/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-EXPORT_DIR = "/tmp/exports"
-os.makedirs(EXPORT_DIR, exist_ok=True)
+
 
 LAST_RESULT={}
 
