@@ -476,7 +476,6 @@ const folderExists = existingFolders.some(
         f.folder_name.toLowerCase() ===
         targetFolder.toLowerCase()
 );
-setPercentage(80);
 if (folderExists) {
     alert("This folder already exists.");
     return;
@@ -487,7 +486,6 @@ await extractZip(
     uploaded.filename.replace(".zip", ""),
     targetFolder
 );
-setPercentage(90);
 
 // reload folders AFTER extraction
 const updatedFolders = await listFolders();
@@ -496,7 +494,6 @@ setFolders(updatedFolders);
 
 setShowFolders(true);
 
-setPercentage(100);
 
 await loadRecentFiles();
     setStatusMessage("Extraction completed.");
