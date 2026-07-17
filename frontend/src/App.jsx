@@ -342,6 +342,8 @@ export default function AutomaticResumeTracker() {
   const [processingSteps, setProcessingSteps] = useState([
   { name: "Reading Resume", done: false },
   { name: "Extracting Text", done: false },
+  {name:  "Cleaning data", done: false},
+  {name:  "Generating Preview", done: false},
 ]);
   const [zipError, setZipError] = useState(false);
 
@@ -513,11 +515,11 @@ await loadRecentFiles();
   function updateSteps(status, progressValue) {
   setProcessingSteps(
     [
-  { name: "Reading Resumes", done: progress >= 20 },
-  { name: "Extracting Text", done: progress >= 50 },
-  { name: "Cleaning Data", done: progress >= 80 },
-  { name: "Generating Preview", done: progress >= 95 },
-]
+  { name: "Reading Resumes", done: progressValue >= 20 },
+  { name: "Extracting Text", done: progressValue >= 50 },
+  { name: "Cleaning Data", done: progressValue >= 80 },
+  { name: "Generating Preview", done: progressValue >= 95 },
+]);}
 
   const handleGenerate = async (folderName) => {
     let interval;
