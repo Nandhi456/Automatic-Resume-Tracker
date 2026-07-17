@@ -563,7 +563,7 @@ const handleDeleteFolder = async (folder_name) => {
     <div style={container}>
       {/* PAGE HEADING */}
       <div style={containerTitle}>
-        <h1 style={containerTitleText}>Automatic Resume Tracker</h1>
+        <h1 style={containerTitleText}>Automate Resume Tracker</h1>
       </div>
 
       <div style={contentWrapper}>
