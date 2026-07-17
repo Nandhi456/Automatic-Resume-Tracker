@@ -588,13 +588,16 @@ def process_resumes(files_data):
         JOB_STATUS["progress"] = 100
 
     JOB_STATUS["status"] = "processing"
+    JOB_STATUS["progress"] = 0
+    JOB_STATUS["message"] = "Starting resume processing..."
 
     for i, (file, file_bytes) in enumerate(files_data):
 
-        JOB_STATUS["progress"] = int((i / total) * 100) if total else 100
-        JOB_STATUS["current_file"] = file
-        JOB_STATUS["message"] = f"Reading {file}"
-        JOB_STATUS["message"] = "Extracting text..."
+         JOB_STATUS["progress"] = int(((i + 1) / total) * 70)
+         JOB_STATUS["current_file"] = file
+         JOB_STATUS["message"] = (
+          f"Processing resume {i+1}/{total}: {file}"
+         )
 
         if file.lower().endswith(".pdf"):
             text = extract_text_from_pdf(file_bytes)
@@ -619,7 +622,9 @@ def process_resumes(files_data):
         skills = extract_skills(text)
         category = categorize(text)
 
-        JOB_STATUS["message"] = "Extracting candidate details..."
+        JOB_STATUS["message"] = (
+         f"Extracting details from {file}"
+          )
 
         if len(name) > 40 or name.lower() in ["resume", "curriculum vitae"]:
             name = ""
@@ -659,7 +664,7 @@ def process_resumes(files_data):
             "failed_files": len(failed_files),
         }
 
-    JOB_STATUS["progress"] = 70
+    JOB_STATUS["progress"] = 80
     JOB_STATUS["message"] = "Cleaning extracted data..."
 
     clean_df = raw_df.copy()
@@ -676,6 +681,9 @@ def process_resumes(files_data):
     APP_STATS["total"] = total
     APP_STATS["processed"] = len(clean_df)
     APP_STATS["failed"] = len(failed_files)
+
+    JOB_STATUS["progress"] = 90
+    JOB_STATUS["message"] = "Preparing preview..."
 
     JOB_STATUS["progress"] = 100
     JOB_STATUS["status"] = "done"
@@ -719,6 +727,12 @@ async def extract_zip_file(payload: ExtractRequest):
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
             names = zip_ref.namelist()
 
+            total_files = len([n for n in names if not n.endswith("/")])
+
+             JOB_STATUS["status"] = "extracting"
+             JOB_STATUS["progress"] = 0
+             JOB_STATUS["message"] = "Starting extraction..."
+
             # Handle nested single-folder zips
             top_level = set(n.split("/")[0] for n in names if n)
             prefix_to_strip = ""
@@ -727,9 +741,10 @@ async def extract_zip_file(payload: ExtractRequest):
                 if all(n.startswith(only_entry + "/") or n == only_entry for n in names):
                     prefix_to_strip = only_entry + "/"
 
+            processed = 0
             for name in names:
                 if name.endswith("/"):
-                    continue  # skip directory entries
+                    continue 
 
                 file_bytes = zip_ref.read(name)
                 clean_name = name[len(prefix_to_strip):] if prefix_to_strip else name
@@ -740,7 +755,13 @@ async def extract_zip_file(payload: ExtractRequest):
                 b2_key = f"extracted/{destination_name}/{filename_only}"
                 s3.upload_fileobj(io.BytesIO(file_bytes), B2_BUCKET_NAME, b2_key)
                 file_count += 1
+                processed += 1
 
+                 JOB_STATUS["progress"] = int(processed * 100 / total_files)
+                 JOB_STATUS["message"] = f"Extracting {processed}/{total_files}"
+                 JOB_STATUS["current_file"] = filename_only
+
+        
         return ExtractResponse(
             folder_name=destination_name,
             file_count=file_count)
