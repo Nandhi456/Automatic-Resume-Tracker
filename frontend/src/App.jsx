@@ -452,15 +452,13 @@ export default function AutomaticResumeTracker() {
   try {
     setIsExtracting(true);
     setPercentage(10);
-    setPercentage(50);
-    setPercentage(70);
-    setPercentage(80);
     const interval = setInterval(async () => {
     try {
         const p = await getProgress();
 
         setPercentage(p.progress);
         setStatusMessage(p.message);
+        setPercentage(50);
 
         if (p.status === "done") {
             clearInterval(interval);
@@ -529,11 +527,11 @@ await loadRecentFiles();
         setReadingFolder(folderName);
         setProcessing(true);
         setProgress(10);
-        setProgress(50);
         interval = setInterval(async () => {
         const p = await getProgress();
         setProgress(p.progress);
         setProgressMessage(p.message);
+        setProgress(50);
         setCurrentFile(p.current_file || "");
         updateSteps(p.status, p.progress);
         if (p.status === "done") {
