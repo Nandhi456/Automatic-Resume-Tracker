@@ -450,7 +450,7 @@ export default function AutomaticResumeTracker() {
   try {
     setIsExtracting(true);
     setPercentage(10);
-    //setPercentage(40);
+    setPercentage(40);
   
     // check existing folders first
 const existingFolders = await listFolders();
@@ -468,14 +468,15 @@ if (folderExists) {
     alert("This folder already exists.");
     return;
 }
-
+setPercentage(50);
+setPercentage(60);
 const uploaded = await uploadZip(zipFile);
 
 await extractZip(
     uploaded.filename.replace(".zip", ""),
     targetFolder
 );
-
+setPercentage(70);
 setPercentage(80);
 
 // reload folders AFTER extraction
@@ -486,6 +487,7 @@ setFolders(updatedFolders);
 setShowFolders(true);
 
 await loadRecentFiles();
+    setPercentage(90);
     setPercentage(100);
     setStatusMessage("Extraction completed.");
 
