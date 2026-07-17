@@ -1,5 +1,6 @@
 import os
 import re
+import asyncio
 from typing import Any, Dict, List
 import docx
 import pandas as pd
@@ -137,7 +138,7 @@ def extract_linkedin(text):
 
     return ""
 
-# ✅ Improved name extraction
+# Improved name extraction
 def extract_name(text):
 
     lines = text.split("\n")
@@ -192,10 +193,6 @@ def extract_name(text):
 
 def extract_experience(text):
 
-    # --------------------------------
-    # Case 1: Explicit experience
-    # --------------------------------
-
     explicit = re.findall(
         r'(\d+)\s*\+?\s*(?:years?|yrs?)',
         text,
@@ -207,10 +204,6 @@ def extract_experience(text):
 
         if exp < 50:
             return exp
-
-    # --------------------------------
-    # Case 2: DD/MM/YYYY date ranges
-    # --------------------------------
 
     ddmmyyyy = re.findall(
         r'(\d{2}/\d{2}/\d{4})\s*[–-]\s*(Current|Present|\d{2}/\d{2}/\d{4})',
@@ -259,10 +252,6 @@ def extract_experience(text):
                 (max_end - min_start).days
                 / 365.25
             )
-
-    # --------------------------------
-    # Case 3: Month Year format
-    # --------------------------------
 
     month_pattern = re.findall(
 
@@ -325,10 +314,6 @@ def extract_experience(text):
                 ).days / 365.25
             )
 
-    # --------------------------------
-    # Case 4: YYYY-YYYY
-    # --------------------------------
-
     years = re.findall(
         r'(20\d{2})\s*[-–]\s*(20\d{2}|Present|Current)',
         text,
@@ -356,7 +341,7 @@ def extract_experience(text):
         return max(ends) - min(starts)
 
     return 0
-import re
+
 
 def get_experience_section(text):
 
@@ -406,8 +391,6 @@ def extract_qualification(text):
         r'\bDCS\b'
         r'\bDCE\b',
 
-
-
     ]
 
     results = []
@@ -431,7 +414,6 @@ def extract_qualification(text):
 
 KNOWN_LOCATIONS = {
 
-    # India
     "bangalore",
     "bengaluru",
     "hyderabad",
@@ -453,7 +435,6 @@ KNOWN_LOCATIONS = {
     "hosur",
     "lucknow",
 
-    # States
     "telangana",
     "karnataka",
     "tamil nadu",
@@ -461,7 +442,6 @@ KNOWN_LOCATIONS = {
     "maharashtra",
     "west bengal",
 
-    # Countries
     "india",
     "germany",
     "france",
@@ -709,11 +689,55 @@ async def get_upload_url(filename: str):
         return {"upload_url": presigned_url, "filename": filename}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate URL: {e}")
-        
+
+
+def _do_extraction(zip_bytes, destination_name):
+    
+    file_count = 0
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
+        names = zip_ref.namelist()
+
+        total_files = len([n for n in names if not n.endswith("/")])
+        JOB_STATUS["status"] = "extracting"
+        JOB_STATUS["progress"] = 0
+        JOB_STATUS["message"] = "Starting extraction..."
+
+        # Handle nested single-folder zips
+        top_level = set(n.split("/")[0] for n in names if n)
+        prefix_to_strip = ""
+        if len(top_level) == 1:
+            only_entry = list(top_level)[0]
+            if all(n.startswith(only_entry + "/") or n == only_entry for n in names):
+                prefix_to_strip = only_entry + "/"
+
+        processed = 0
+        for name in names:
+            if name.endswith("/"):
+                continue
+
+            file_bytes = zip_ref.read(name)
+            clean_name = name[len(prefix_to_strip):] if prefix_to_strip else name
+            filename_only = clean_name.split("/")[-1]
+            if not filename_only:
+                continue
+
+            b2_key = f"extracted/{destination_name}/{filename_only}"
+            s3.upload_fileobj(io.BytesIO(file_bytes), B2_BUCKET_NAME, b2_key)
+            file_count += 1
+            processed += 1
+            JOB_STATUS["progress"] = int(processed * 100 / total_files)
+            JOB_STATUS["message"] = f"Extracting {processed}/{total_files}"
+            JOB_STATUS["current_file"] = filename_only
+
+        JOB_STATUS["status"] = "done"
+        JOB_STATUS["progress"] = 100
+        JOB_STATUS["message"] = "Extraction completed"
+
+    return file_count
 
 @app.post("/api/extract")
 async def extract_zip_file(payload: ExtractRequest):
-
+    
     folder_name = payload.folder_name
     destination_name = payload.destination_name or folder_name
 
@@ -721,46 +745,8 @@ async def extract_zip_file(payload: ExtractRequest):
         obj = s3.get_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
         zip_bytes = obj["Body"].read()
 
-        file_count = 0
-        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_ref:
-            names = zip_ref.namelist()
+        file_count = await asyncio.to_thread(_do_extraction, zip_bytes, destination_name)
 
-            total_files = len([n for n in names if not n.endswith("/")])
-            JOB_STATUS["status"] = "extracting"
-            JOB_STATUS["progress"] = 0
-            JOB_STATUS["message"] = "Starting extraction..."
-
-            # Handle nested single-folder zips
-            top_level = set(n.split("/")[0] for n in names if n)
-            prefix_to_strip = ""
-            if len(top_level) == 1:
-                only_entry = list(top_level)[0]
-                if all(n.startswith(only_entry + "/") or n == only_entry for n in names):
-                    prefix_to_strip = only_entry + "/"
-
-            processed = 0
-            for name in names:
-                if name.endswith("/"):
-                    continue 
-
-                file_bytes = zip_ref.read(name)
-                clean_name = name[len(prefix_to_strip):] if prefix_to_strip else name
-                filename_only = clean_name.split("/")[-1]
-                if not filename_only:
-                    continue
-
-                b2_key = f"extracted/{destination_name}/{filename_only}"
-                s3.upload_fileobj(io.BytesIO(file_bytes), B2_BUCKET_NAME, b2_key)
-                file_count += 1
-                processed += 1
-                JOB_STATUS["progress"] = int(processed * 100 / total_files)
-                JOB_STATUS["message"] = f"Extracting {processed}/{total_files}"
-                JOB_STATUS["current_file"] = filename_only
-                
-            JOB_STATUS["status"] = "done"
-            JOB_STATUS["progress"] = 100
-            JOB_STATUS["message"] = "Extraction completed"
-        
         return ExtractResponse(
             folder_name=destination_name,
             file_count=file_count)
@@ -844,7 +830,7 @@ async def preview(folder_name: str):
         if not files_data:
             return {"error": "Folder not found"}
 
-        data = process_resumes(files_data)
+        data = await asyncio.to_thread(process_resumes, files_data)
         data["folder_name"] = folder_name
         LAST_RESULT[folder_name] = data
         save_result_to_b2(folder_name, data)
@@ -920,6 +906,27 @@ async def open_file(path: str):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"File not found: {e}")
 
+@app.delete("/api/folders/{folder_name}")
+async def delete_folder(folder_name: str):
+    try:
+        prefix = f"extracted/{folder_name}/"
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=B2_BUCKET_NAME, Prefix=prefix):
+            objects_to_delete = [{"Key": obj["Key"]} for obj in page.get("Contents", [])]
+            if objects_to_delete:
+                s3.delete_objects(
+                    Bucket=B2_BUCKET_NAME,
+                    Delete={"Objects": objects_to_delete}
+                )
+        try:
+            s3.delete_object(Bucket=B2_BUCKET_NAME, Key=folder_name + ".zip")
+        except Exception:
+            pass
+        LAST_RESULT.pop(folder_name, None)
+        return {"message": f"Folder '{folder_name}' deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/reset")
 async def reset():
 
@@ -953,4 +960,3 @@ async def reset():
 async def progress():
 
     return JOB_STATUS
-
