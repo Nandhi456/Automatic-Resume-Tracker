@@ -586,17 +586,12 @@ def process_resumes(files_data):
     if not files_data:
         JOB_STATUS["status"] = "done"
         JOB_STATUS["progress"] = 100
-        JOB_STATUS["status"] = "processing"
-        JOB_STATUS["progress"] = 0
-        JOB_STATUS["message"] = "Starting resume processing..."
-
+        
     for i, (file, file_bytes) in enumerate(files_data):
 
          JOB_STATUS["progress"] = int(((i + 1) / total) * 70)
          JOB_STATUS["current_file"] = file
-         JOB_STATUS["message"] = (
-          f"Processing resume {i+1}/{total}: {file}"
-         )
+         JOB_STATUS["message"] = f"Processing resume {i+1}/{total}: {file}"
 
         if file.lower().endswith(".pdf"):
             text = extract_text_from_pdf(file_bytes)
@@ -698,6 +693,9 @@ def process_resumes(files_data):
         "removed": len(raw_df) - len(clean_df),
         "failed_files": len(failed_files),
     }
+    JOB_STATUS["status"] = "processing"
+    JOB_STATUS["progress"] = 0
+    JOB_STATUS["message"] = "Starting resume processing..."
     
 @app.get("/api/get_upload_url")
 async def get_upload_url(filename: str):
@@ -757,7 +755,10 @@ async def extract_zip_file(payload: ExtractRequest):
                 JOB_STATUS["progress"] = int(processed * 100 / total_files)
                 JOB_STATUS["message"] = f"Extracting {processed}/{total_files}"
                 JOB_STATUS["current_file"] = filename_only
-
+                
+                JOB_STATUS["status"] = "done"
+                JOB_STATUS["progress"] = 100
+                JOB_STATUS["message"] = "Extraction completed"
         
         return ExtractResponse(
             folder_name=destination_name,
