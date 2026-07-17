@@ -586,10 +586,9 @@ def process_resumes(files_data):
     if not files_data:
         JOB_STATUS["status"] = "done"
         JOB_STATUS["progress"] = 100
-
-    JOB_STATUS["status"] = "processing"
-    JOB_STATUS["progress"] = 0
-    JOB_STATUS["message"] = "Starting resume processing..."
+        JOB_STATUS["status"] = "processing"
+        JOB_STATUS["progress"] = 0
+        JOB_STATUS["message"] = "Starting resume processing..."
 
     for i, (file, file_bytes) in enumerate(files_data):
 
@@ -728,10 +727,9 @@ async def extract_zip_file(payload: ExtractRequest):
             names = zip_ref.namelist()
 
             total_files = len([n for n in names if not n.endswith("/")])
-
-             JOB_STATUS["status"] = "extracting"
-             JOB_STATUS["progress"] = 0
-             JOB_STATUS["message"] = "Starting extraction..."
+            JOB_STATUS["status"] = "extracting"
+            JOB_STATUS["progress"] = 0
+            JOB_STATUS["message"] = "Starting extraction..."
 
             # Handle nested single-folder zips
             top_level = set(n.split("/")[0] for n in names if n)
@@ -756,10 +754,9 @@ async def extract_zip_file(payload: ExtractRequest):
                 s3.upload_fileobj(io.BytesIO(file_bytes), B2_BUCKET_NAME, b2_key)
                 file_count += 1
                 processed += 1
-
-                 JOB_STATUS["progress"] = int(processed * 100 / total_files)
-                 JOB_STATUS["message"] = f"Extracting {processed}/{total_files}"
-                 JOB_STATUS["current_file"] = filename_only
+                JOB_STATUS["progress"] = int(processed * 100 / total_files)
+                JOB_STATUS["message"] = f"Extracting {processed}/{total_files}"
+                JOB_STATUS["current_file"] = filename_only
 
         
         return ExtractResponse(
