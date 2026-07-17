@@ -451,37 +451,33 @@ export default function AutomaticResumeTracker() {
 
   try {
     setIsExtracting(true);
-    setPercentage(10);
-    setPercentage(40);
     const interval = setInterval(async () => {
     try {
         const p = await getProgress();
 
         setPercentage(p.progress);
         setStatusMessage(p.message);
-        //setPercentage(50);
 
         if (p.status === "done") {
             clearInterval(interval);
-        }
+        }   setPercentage(50);
     } catch (e) {
         clearInterval(interval);
     }
 }, 300);
-  
+setPercentage(60);
     // check existing folders first
 const existingFolders = await listFolders();
 const targetFolder =
     destination.trim() ||
     zipFile.name.replace(".zip", "");
-setPercentage(100);
 
 const folderExists = existingFolders.some(
     f =>
         f.folder_name.toLowerCase() ===
         targetFolder.toLowerCase()
 );
-
+setPercentage(80);
 if (folderExists) {
     alert("This folder already exists.");
     return;
@@ -491,7 +487,7 @@ const uploaded = await uploadZip(zipFile);
 await extractZip(
     uploaded.filename.replace(".zip", ""),
     targetFolder
-);
+);setPercentage(90);
 
 // reload folders AFTER extraction
 const updatedFolders = await listFolders();
@@ -502,6 +498,7 @@ setShowFolders(true);
 
 await loadRecentFiles();
     setStatusMessage("Extraction completed.");
+    setPercentage(100);
 
   } catch (err) {
     console.error(err);
