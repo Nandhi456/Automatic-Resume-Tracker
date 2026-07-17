@@ -460,12 +460,11 @@ export default function AutomaticResumeTracker() {
 
         if (p.status === "done") {
             clearInterval(interval);
-        }   setPercentage(50);
+        }
     } catch (e) {
         clearInterval(interval);
     }
 }, 300);
-setPercentage(60);
     // check existing folders first
 const existingFolders = await listFolders();
 const targetFolder =
@@ -487,7 +486,8 @@ const uploaded = await uploadZip(zipFile);
 await extractZip(
     uploaded.filename.replace(".zip", ""),
     targetFolder
-);setPercentage(90);
+);
+setPercentage(90);
 
 // reload folders AFTER extraction
 const updatedFolders = await listFolders();
@@ -496,11 +496,13 @@ setFolders(updatedFolders);
 
 setShowFolders(true);
 
+setPercentage(100);
+
 await loadRecentFiles();
     setStatusMessage("Extraction completed.");
-    setPercentage(100);
 
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err);
     setStatusMessage(
         err.message || "Extraction failed.");
@@ -532,7 +534,7 @@ await loadRecentFiles();
         setProgressMessage(p.message);
         //setProgress(50);
         setCurrentFile(p.current_file || "");
-        updateSteps(p.message);
+        updateSteps(p.status, P.progressValue);
         if (p.status === "done") {
            clearInterval(interval);
           }
