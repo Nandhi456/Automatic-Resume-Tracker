@@ -458,7 +458,7 @@ export default function AutomaticResumeTracker() {
 
         setPercentage(p.progress);
         setStatusMessage(p.message);
-        setPercentage(50);
+        //setPercentage(50);
 
         if (p.status === "done") {
             clearInterval(interval);
@@ -531,7 +531,7 @@ await loadRecentFiles();
         const p = await getProgress();
         setProgress(p.progress);
         setProgressMessage(p.message);
-        setProgress(50);
+        //setProgress(50);
         setCurrentFile(p.current_file || "");
         updateSteps(p.status, p.progress);
         if (p.status === "done") {
