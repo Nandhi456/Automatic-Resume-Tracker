@@ -4,7 +4,7 @@ import { Folder, FileSpreadsheet, Loader2 } from "lucide-react";
 import Preview from "./preview";
 import {uploadZip, extractZip, listFolders,getPreview, getRecentFiles, openRecentFile, getStatistics, resetApplication, getProgress} from "./previewApi";
 
-const container = {
+const container = { 
   height: "100vh",
   width: "100vw",
   display: "flex",
