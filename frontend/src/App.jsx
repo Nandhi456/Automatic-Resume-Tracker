@@ -451,7 +451,8 @@ export default function AutomaticResumeTracker() {
 
   try {
     setIsExtracting(true);
-    //setPercentage(10);
+    setPercentage(10);
+    setPercentage(40);
     const interval = setInterval(async () => {
     try {
         const p = await getProgress();
@@ -473,6 +474,7 @@ const existingFolders = await listFolders();
 const targetFolder =
     destination.trim() ||
     zipFile.name.replace(".zip", "");
+setPercentage(100);
 
 const folderExists = existingFolders.some(
     f =>
@@ -533,7 +535,7 @@ await loadRecentFiles();
         setProgressMessage(p.message);
         //setProgress(50);
         setCurrentFile(p.current_file || "");
-        updateSteps(p.status, p.progress);
+        updateSteps(p.message);
         if (p.status === "done") {
            clearInterval(interval);
           }
