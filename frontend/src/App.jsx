@@ -8,7 +8,7 @@ const container = {
   height: "100vh",
   width: "100vw",
   display: "flex",
-  flexDirection: "column",
+  flexDirection: "column", 
   justifyContent: "flex-start",
   alignItems: "stretch",
   gap: "0",
