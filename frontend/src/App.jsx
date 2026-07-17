@@ -429,128 +429,125 @@ export default function AutomaticResumeTracker() {
   }
 
   const handleExtract = async () => {
-  /*if (!zipFile) {
-
-    setZipError(true);
-
-    setTimeout(() => {
-        setZipError(false);
-    }, 2500);
-
-    return;
-}
-  if (!zipFile) {
-    setStatusMessage("Please choose a ZIP file");
-    return;
-  }*/
-
-  if (!zipFile) {
-    alert("Please select a ZIP file.");
-    return;
-}
-
-  try {
-    setIsExtracting(true);
-    const interval = setInterval(async () => {
-    try {
-        const p = await getProgress();
-
-        setPercentage(p.progress);
-        setStatusMessage(p.message);
-
-        if (p.status === "done") {
-            clearInterval(interval);
-        }
-    } catch (e) {
-        clearInterval(interval);
+    if (!zipFile) {
+        alert("Please select a ZIP file.");
+        return;
     }
-}, 300);
-    // check existing folders first
-const existingFolders = await listFolders();
-const targetFolder =
-    destination.trim() ||
-    zipFile.name.replace(".zip", "");
 
-const folderExists = existingFolders.some(
-    f =>
-        f.folder_name.toLowerCase() ===
-        targetFolder.toLowerCase()
-);
-if (folderExists) {
-    alert("This folder already exists.");
-    return;
-}
-const uploaded = await uploadZip(zipFile);
+    try {
+        setIsExtracting(true);
+        setPercentage(0);
+        setStatusMessage("Uploading ZIP...");
 
-await extractZip(
-    uploaded.filename.replace(".zip", ""),
-    targetFolder
-);
+        setPercentage(10);
 
-// reload folders AFTER extraction
-const updatedFolders = await listFolders();
+        const existingFolders = await listFolders();
 
-setFolders(updatedFolders);
+        setPercentage(20);
 
-setShowFolders(true);
+        const targetFolder =
+            destination.trim() ||
+            zipFile.name.replace(".zip", "");
 
+        const folderExists = existingFolders.some(
+            f => f.folder_name.toLowerCase() === targetFolder.toLowerCase()
+        );
 
-await loadRecentFiles();
-    setStatusMessage("Extraction completed.");
+        if (folderExists) {
+            alert("This folder already exists.");
+            return;
+        }
 
-  }
-  catch (err) {
-    console.error(err);
-    setStatusMessage(
-        err.message || "Extraction failed.");
-  } finally {
+        setStatusMessage("Uploading ZIP...");
+        setPercentage(35);
 
-    clearInterval(interval);
-    setIsExtracting(false);
-  }
+        const uploaded = await uploadZip(zipFile);
+
+        setStatusMessage("Extracting ZIP...");
+        setPercentage(50);
+
+        await extractZip(
+            uploaded.filename.replace(".zip", ""),
+            targetFolder
+        );
+
+        setPercentage(80);
+
+        const updatedFolders = await listFolders();
+        setFolders(updatedFolders);
+
+        setShowFolders(true);
+
+        await loadRecentFiles();
+
+        setPercentage(100);
+        setStatusMessage("Extraction completed.");
+    } catch (err) {
+        console.error(err);
+        setStatusMessage(err.message);
+    } finally {
+        setTimeout(() => {
+            setIsExtracting(false);
+        }, 500);
+    }
 };
 
-  function updateSteps(status, progressValue) {
+  function updateSteps(status, progress) {
   setProcessingSteps(
     [
-  { name: "Reading Resumes", done: progressValue >= 20 },
-  { name: "Extracting Text", done: progressValue >= 50 },
-  { name: "Cleaning Data", done: progressValue >= 80 },
-  { name: "Generating Preview", done: progressValue >= 95 },
+  { name: "Reading Resumes", done: progress >= 20 },
+  { name: "Extracting Text", done: progress >= 50 },
+  { name: "Cleaning Data", done: progress >= 80 },
+  { name: "Generating Preview", done: progress >= 95 },
 ]);}
 
   const handleGenerate = async (folderName) => {
-    let interval;
     try {
         setReadingFolder(folderName);
         setProcessing(true);
-        //setProgress(10);
-        interval = setInterval(async () => {
-        const p = await getProgress();
-        setProgress(p.progress);
-        setProgressMessage(p.message);
-        //setProgress(50);
-        setCurrentFile(p.current_file || "");
-        updateSteps(p.status, P.progressValue);
-        if (p.status === "done") {
-           clearInterval(interval);
-          }
-        }, 300);
-      
-        const preview = await getPreview(folderName);
+
+        setProgress(5);
+        setCurrentFile("Loading resumes...");
+        updateSteps("", 5);
+
+        setProgress(20);
+        setCurrentFile("Reading resumes...");
+        updateSteps("", 20);
+
+        const previewPromise = getPreview(folderName);
+
+        setProgress(40);
+        setCurrentFile("Extracting resume data...");
+        updateSteps("", 40);
+
+        setProgress(60);
+        setCurrentFile("Cleaning extracted data...");
+        updateSteps("", 60);
+
+        const preview = await previewPromise;
+
+        setProgress(85);
+        setCurrentFile("Generating preview...");
+        updateSteps("", 85);
+
         setPreviewData(preview);
         setPreviewFolder(folderName);
+
         await loadStatistics();
         await loadRecentFiles();
+
+        setProgress(100);
+        setCurrentFile("Completed");
+        updateSteps("", 100);
+
     } catch (err) {
         alert(err.message);
     } finally {
-        clearInterval(interval);
-        setReadingFolder(null);
-        setProcessing(false);
-
+        setTimeout(() => {
+            setProcessing(false);
+            setReadingFolder(null);
+        }, 500);
     }
-
 };
 /*
 const handleDeleteFolder = async (folder_name) => {
