@@ -449,8 +449,20 @@ export default function AutomaticResumeTracker() {
 
   try {
     setIsExtracting(true);
-    setPercentage(10);
-    setPercentage(40);
+    const interval = setInterval(async () => {
+    try {
+        const p = await getProgress();
+
+        setPercentage(p.progress);
+        setStatusMessage(p.message);
+
+        if (p.status === "done") {
+            clearInterval(interval);
+        }
+    } catch (e) {
+        clearInterval(interval);
+    }
+}, 300);
   
     // check existing folders first
 const existingFolders = await listFolders();
@@ -468,8 +480,6 @@ if (folderExists) {
     alert("This folder already exists.");
     return;
 }
-setPercentage(50);
-setPercentage(60);
 const uploaded = await uploadZip(zipFile);
 
 await extractZip(
@@ -487,8 +497,6 @@ setFolders(updatedFolders);
 setShowFolders(true);
 
 await loadRecentFiles();
-    setPercentage(90);
-    setPercentage(100);
     setStatusMessage("Extraction completed.");
 
   } catch (err) {
@@ -497,19 +505,19 @@ await loadRecentFiles();
         err.message || "Extraction failed.");
   } finally {
 
-    setTimeout(() => {
-      setIsExtracting(false);
-      setPercentage(0);
-    }, 500);
+    clearInterval(interval);
+    setIsExtracting(false);
   }
 };
 
   function updateSteps(status, progressValue) {
-  setProcessingSteps([
-    { name: "Reading Resume", done: progressValue > 0 },
-    { name: "Extracting Text", done: status === "done" || progressValue >= 70 },
-  ]);
-}
+  setProcessingSteps(
+    [
+  { name: "Reading Resumes", done: progress >= 20 },
+  { name: "Extracting Text", done: progress >= 50 },
+  { name: "Cleaning Data", done: progress >= 80 },
+  { name: "Generating Preview", done: progress >= 95 },
+]
 
   const handleGenerate = async (folderName) => {
     let interval;
