@@ -626,11 +626,7 @@ def process_resumes(files_data):
         if len(name) > 40 or name.lower() in ["resume", "curriculum vitae"]:
             name = ""
 
-        score = 0
-        if name: score += 1
-        if email: score += 1
-        if phone: score += 1
-        if skills: score += 1
+       
 
         row = {
             "FileName": file,
@@ -643,7 +639,6 @@ def process_resumes(files_data):
             "Category": category,
             "Location": location,
             "Skills": skills,
-            "Score": score
         }
 
         raw_data.append(row)
@@ -665,11 +660,11 @@ def process_resumes(files_data):
     JOB_STATUS["message"] = "Cleaning extracted data..."
 
     clean_df = raw_df.copy()
-    clean_df = clean_df[clean_df["Score"] >= 2]
+    #clean_df = clean_df[clean_df["Score"] >= 2]
     clean_df = clean_df[(clean_df["Email"] != "") | (clean_df["Phone"] != "")]
     clean_df = clean_df[(clean_df["Experience"] >= 0) & (clean_df["Experience"] <= 40)]
     clean_df = clean_df[~((clean_df["Name"] == "") & (clean_df["Email"] == ""))]
-    clean_df = clean_df.sort_values(by="Score", ascending=False)
+    #clean_df = clean_df.sort_values(by="Score", ascending=False)
     clean_df = clean_df.drop_duplicates(subset=["Email"], keep="first")
     clean_df = clean_df.drop_duplicates(subset=["Phone"], keep="first")
     clean_df = clean_df.map(lambda x: x.strip() if isinstance(x, str) else x)
